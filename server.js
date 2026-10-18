@@ -4,21 +4,18 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const cookieSession = require('cookie-session');
+const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Ensure directories exist
+// Direct Supabase Connection
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://rtfuamnwfrtyitxbakrl.supabase.co';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0ZnVhbW53ZnJ0eWl0eGJha3JsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzMzY0ODgsImV4cCI6MjEwNzkxMjQ4OH0.treB5Pf3sA_07z5v20RnZXz5flHWdNg3RrpbR_sQEIY';
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Persistent RSA keypair generation
 if (!fs.existsSync('keys')) fs.mkdirSync('keys');
-if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
-if (!fs.existsSync('data')) fs.mkdirSync('data');
-
-const USERS_FILE = path.join('data', 'users.json');
-if (!fs.existsSync(USERS_FILE)) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify({}));
-}
-
-// Generate RSA keys if not present
 if (!fs.existsSync('keys/private.pem')) {
   const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
     modulusLength: 4096,
@@ -32,47 +29,19 @@ if (!fs.existsSync('keys/private.pem')) {
 const privateKey = fs.readFileSync('keys/private.pem', 'utf8');
 const publicKey = fs.readFileSync('keys/public.pem', 'utf8');
 
-// Storage for skins and capes
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => {
-    const user = req.session.user.toLowerCase();
-    if (file.fieldname === 'skin') {
-      cb(null, `${user}_skin.png`);
-    } else if (file.fieldname === 'cape') {
-      cb(null, `${user}_cape.png`);
-    } else {
-      cb(null, `${user}_${file.originalname}`);
-    }
-  }
-});
-const upload = multer({ storage });
+// In-memory file processing for direct cloud upload
+const upload = multer({ storage: multer.memoryStorage() });
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieSession({
   name: 'aksu_session',
-  keys: ['aksu-launcher-secret-key-salt'],
-  maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
+  keys: ['aksu-permanent-secret-auth-key'],
+  maxAge: 60 * 24 * 60 * 60 * 1000
 }));
 
-app.use('/textures', express.static(path.join(__dirname, 'uploads')));
-
-// Helper functions for user storage
-function loadUsers() {
-  try {
-    return JSON.parse(fs.readFileSync(USERS_FILE, 'utf8'));
-  } catch (e) {
-    return {};
-  }
-}
-
-function saveUsers(users) {
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-}
-
-function hashPassword(password) {
-  return crypto.createHash('sha256').update(password).digest('hex');
+function hashPassword(pass) {
+  return crypto.createHash('sha256').update(pass).digest('hex');
 }
 
 function getOfflineUUID(username) {
@@ -82,169 +51,219 @@ function getOfflineUUID(username) {
   return md5.toString('hex');
 }
 
-// Main page (Dashboard if logged in, Login/Register if guest)
+function renderLayout(title, content, activeUser = null) {
+  return `
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${title} | AksuLauncher</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      :root { --bg: #0b0d13; --card: #151821; --border: #232736; --accent: #3b82f6; --accent-hover: #2563eb; --text: #f3f4f6; --dim: #9ca3af; }
+      * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+      body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+      nav { background: rgba(21, 24, 33, 0.9); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 16px 28px; position: sticky; top: 0; z-index: 100; }
+      .brand { font-size: 1.25rem; font-weight: 800; color: #fff; text-decoration: none; }
+      .brand span { color: var(--accent); }
+      .nav-links { display: flex; gap: 20px; align-items: center; }
+      .nav-links a { color: var(--dim); text-decoration: none; font-size: 0.95rem; font-weight: 500; }
+      .nav-links a:hover { color: #fff; }
+      .btn { background: var(--accent); color: #fff; padding: 10px 20px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.9rem; border: none; cursor: pointer; display: inline-block; text-align: center; }
+      .btn:hover { background: var(--accent-hover); }
+      .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+      .btn-outline:hover { background: #1c202d; }
+      .container { max-width: 950px; margin: 0 auto; padding: 40px 20px; flex: 1; width: 100%; }
+      .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 28px; }
+      footer { border-top: 1px solid var(--border); text-align: center; padding: 20px; color: var(--dim); font-size: 0.85rem; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/" class="brand">AKSU<span>LAUNCHER</span></a>
+      <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/downloads">Download APK</a>
+        ${activeUser 
+          ? `<a href="/dashboard">Cosmetics</a><a href="/logout" style="color:#ef4444;">Log Out (${activeUser})</a>` 
+          : `<a href="/auth" class="btn" style="padding: 8px 16px;">Sign In</a>`}
+      </div>
+    </nav>
+    <div class="container">${content}</div>
+    <footer>&copy; 2026 AksuLauncher &bull; Powered by AKSU1501</footer>
+  </body>
+  </html>`;
+}
+
+// 1. Home
 app.get('/', (req, res) => {
   if (req.headers.accept && req.headers.accept.includes('application/json')) {
-    const host = req.get('host');
     return res.json({
-      meta: {
-        serverName: "AksuSkinServer",
-        implementationName: "AksuSkinServer",
-        implementationVersion: "1.0.0"
-      },
-      skinDomains: [host],
+      meta: { serverName: "AksuSkinServer", implementationName: "AksuSkinServer", implementationVersion: "2.0.0" },
+      skinDomains: [req.get('host'), new URL(SUPABASE_URL).hostname],
       signaturePublickey: publicKey
     });
   }
 
-  const currentUser = req.session ? req.session.user : null;
-
-  if (!currentUser) {
-    return res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>AksuLauncher Accounts</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1117; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 16px; box-sizing: border-box; }
-          .card { background: #1a1d27; padding: 28px; border-radius: 12px; width: 100%; max-width: 380px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
-          h2 { margin-top: 0; text-align: center; }
-          label { display: block; margin-top: 12px; margin-bottom: 6px; font-size: 0.85rem; color: #9ca3af; }
-          input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #2e3446; background: #0f1117; color: #fff; box-sizing: border-box; }
-          button { width: 100%; margin-top: 18px; padding: 11px; border: none; border-radius: 6px; background: #3b82f6; color: #fff; font-weight: 600; cursor: pointer; }
-          .toggle { text-align: center; margin-top: 16px; font-size: 0.85rem; color: #9ca3af; }
-          .toggle a { color: #60a5fa; cursor: pointer; text-decoration: none; }
-        </style>
-      </head>
-      <body>
-        <div class="card" id="loginBox">
-          <h2>Log In</h2>
-          <form action="/login" method="post">
-            <label>Username</label>
-            <input type="text" name="username" required>
-            <label>Password</label>
-            <input type="password" name="password" required>
-            <button type="submit">Sign In</button>
-          </form>
-          <div class="toggle">Don't have an account? <a onclick="toggle()">Register</a></div>
-        </div>
-
-        <div class="card" id="registerBox" style="display:none;">
-          <h2>Create Account</h2>
-          <form action="/register" method="post">
-            <label>Minecraft Username</label>
-            <input type="text" name="username" placeholder="Exact in-game name" required>
-            <label>Email</label>
-            <input type="email" name="email" required>
-            <label>Password</label>
-            <input type="password" name="password" required>
-            <button type="submit">Register</button>
-          </form>
-          <div class="toggle">Already have an account? <a onclick="toggle()">Log In</a></div>
-        </div>
-
-        <script>
-          function toggle() {
-            const l = document.getElementById('loginBox');
-            const r = document.getElementById('registerBox');
-            l.style.display = l.style.display === 'none' ? 'block' : 'none';
-            r.style.display = r.style.display === 'none' ? 'block' : 'none';
-          }
-        </script>
-      </body>
-      </html>
-    `);
-  }
-
-  // Dashboard for logged-in user
-  res.send(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>AksuLauncher - ${currentUser}</title>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1117; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 16px; box-sizing: border-box; }
-        .card { background: #1a1d27; padding: 28px; border-radius: 12px; width: 100%; max-width: 400px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
-        h2 { margin-top: 0; text-align: center; }
-        .user-tag { text-align: center; color: #60a5fa; font-size: 0.95rem; margin-bottom: 20px; }
-        label { display: block; margin-top: 14px; margin-bottom: 6px; font-size: 0.85rem; color: #9ca3af; }
-        select { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #2e3446; background: #0f1117; color: #fff; box-sizing: border-box; }
-        input[type="file"] { width: 100%; font-size: 0.85rem; color: #9ca3af; }
-        button { width: 100%; margin-top: 20px; padding: 12px; border: none; border-radius: 6px; background: #3b82f6; color: #fff; font-weight: 600; cursor: pointer; }
-        .logout { display: block; text-align: center; margin-top: 16px; color: #ef4444; text-decoration: none; font-size: 0.85rem; }
-      </style>
-    </head>
-    <body>
-      <div class="card">
-        <h2>Cosmetics Manager</h2>
-        <div class="user-tag">Logged in as: <b>${currentUser}</b></div>
-        <form action="/upload" method="post" enctype="multipart/form-data">
-          <label>Skin Model</label>
-          <select name="model">
-            <option value="default">Classic 4px (Steve)</option>
-            <option value="slim">Slim 3px (Alex)</option>
-          </select>
-
-          <label>Skin Texture (.png)</label>
-          <input type="file" name="skin">
-
-          <label>Cape / Elytra (.png, optional)</label>
-          <input type="file" name="cape">
-
-          <button type="submit">Save Cosmetics</button>
-        </form>
-        <a class="logout" href="/logout">Log Out</a>
+  const content = `
+    <div style="text-align: center; padding: 50px 0 30px;">
+      <h1 style="font-size: 2.8rem; font-weight: 800; margin-bottom: 16px;">
+        Minecraft Java on Android.<br><span style="color: var(--accent);">Cloud-Synced Cosmetics.</span>
+      </h1>
+      <p style="color: var(--dim); font-size: 1.1rem; max-width: 600px; margin: 0 auto 30px;">
+        Upload custom skins and capes that stay permanently saved and sync seamlessly to AksuLauncher.
+      </p>
+      <div style="display: flex; justify-content: center; gap: 16px;">
+        <a href="/downloads" class="btn" style="font-size: 1rem; padding: 13px 26px;">Download Launcher</a>
+        <a href="/auth" class="btn btn-outline" style="font-size: 1rem; padding: 13px 26px;">Manage Cosmetics</a>
       </div>
-    </body>
-    </html>
-  `);
+    </div>
+  `;
+  res.send(renderLayout('Home', content, req.session ? req.session.user : null));
 });
 
-// Authentication routes
-app.post('/register', (req, res) => {
+// 2. APK Downloads Page
+app.get('/downloads', (req, res) => {
+  const content = `
+    <div style="max-width: 650px; margin: 0 auto;">
+      <h2 style="font-size: 2rem; margin-bottom: 10px;">Downloads Center</h2>
+      <p style="color: var(--dim); margin-bottom: 24px;">Grab the latest compiled AksuLauncher APK build.</p>
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 0;">
+          <div>
+            <div style="font-weight: 600; font-size: 1.05rem;">AksuLauncher (Actions Build)</div>
+            <div style="color: var(--dim); font-size: 0.85rem; margin-top: 4px;">Optimized for Galaxy Tab S9 FE &bull; Java 17</div>
+          </div>
+          <a href="https://github.com/AKSU1501/AksuLauncher/actions" target="_blank" class="btn" style="padding: 10px 18px;">Get APK</a>
+        </div>
+      </div>
+    </div>
+  `;
+  res.send(renderLayout('Downloads', content, req.session ? req.session.user : null));
+});
+
+// 3. Auth Page (Real-time availability check)
+app.get('/auth', (req, res) => {
+  if (req.session && req.session.user) return res.redirect('/dashboard');
+
+  const content = `
+    <div style="max-width: 420px; margin: 0 auto;">
+      <div class="card" id="loginBox">
+        <h2 style="margin-bottom: 6px;">Sign In</h2>
+        <p style="color: var(--dim); font-size: 0.9rem; margin-bottom: 20px;">Manage your AksuLauncher cosmetics.</p>
+        <form action="/login" method="post">
+          <label style="display:block; font-size: 0.85rem; color: var(--dim); margin-bottom: 6px;">Minecraft Username</label>
+          <input type="text" name="username" required style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:#0b0d13; color:#fff; margin-bottom:14px;">
+          
+          <label style="display:block; font-size: 0.85rem; color: var(--dim); margin-bottom: 6px;">Password</label>
+          <input type="password" name="password" required style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:#0b0d13; color:#fff; margin-bottom:20px;">
+
+          <button type="submit" class="btn" style="width:100%; padding:12px;">Log In</button>
+        </form>
+        <div style="text-align: center; margin-top: 18px; font-size: 0.85rem; color: var(--dim);">
+          Need an account? <a onclick="toggleAuth()" style="color: var(--accent); cursor: pointer; text-decoration: underline;">Create one</a>
+        </div>
+      </div>
+
+      <div class="card" id="registerBox" style="display: none;">
+        <h2 style="margin-bottom: 6px;">Create Account</h2>
+        <p style="color: var(--dim); font-size: 0.9rem; margin-bottom: 20px;">Claim your exact in-game name permanently.</p>
+        <form action="/register" method="post">
+          <label style="display:block; font-size: 0.85rem; color: var(--dim); margin-bottom: 6px;">Minecraft Username</label>
+          <input type="text" name="username" id="regUser" onkeyup="checkUsername()" required style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:#0b0d13; color:#fff; margin-bottom:4px;">
+          <div id="userFeedback" style="font-size:0.8rem; margin-bottom: 12px; height: 16px;"></div>
+
+          <label style="display:block; font-size: 0.85rem; color: var(--dim); margin-bottom: 6px;">Email Address</label>
+          <input type="email" name="email" required style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:#0b0d13; color:#fff; margin-bottom:14px;">
+
+          <label style="display:block; font-size: 0.85rem; color: var(--dim); margin-bottom: 6px;">Password</label>
+          <input type="password" name="password" required style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:#0b0d13; color:#fff; margin-bottom:20px;">
+
+          <button type="submit" id="regBtn" class="btn" style="width:100%; padding:12px;">Register & Claim</button>
+        </form>
+        <div style="text-align: center; margin-top: 18px; font-size: 0.85rem; color: var(--dim);">
+          Already claimed? <a onclick="toggleAuth()" style="color: var(--accent); cursor: pointer; text-decoration: underline;">Log In</a>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function toggleAuth() {
+        const l = document.getElementById('loginBox');
+        const r = document.getElementById('registerBox');
+        l.style.display = l.style.display === 'none' ? 'block' : 'none';
+        r.style.display = r.style.display === 'none' ? 'block' : 'none';
+      }
+
+      async function checkUsername() {
+        const name = document.getElementById('regUser').value.trim();
+        const fb = document.getElementById('userFeedback');
+        const btn = document.getElementById('regBtn');
+        if (!name) { fb.innerText = ''; return; }
+
+        const res = await fetch('/api/check-user?username=' + encodeURIComponent(name));
+        const data = await res.json();
+        if (data.available) {
+          fb.innerText = '✓ Username is available';
+          fb.style.color = '#22c55e';
+          btn.disabled = false;
+        } else {
+          fb.innerText = '✕ Username is already claimed';
+          fb.style.color = '#ef4444';
+          btn.disabled = true;
+        }
+      }
+    </script>
+  `;
+  res.send(renderLayout('Account', content));
+});
+
+// Check availability against Supabase
+app.get('/api/check-user', async (req, res) => {
+  const user = (req.query.username || '').toLowerCase().trim();
+  const { data } = await supabase.from('users').select('username').ilike('username', user).maybeSingle();
+  res.json({ available: !data });
+});
+
+// Cloud Registration
+app.post('/register', async (req, res) => {
   const username = (req.body.username || '').trim();
   const email = (req.body.email || '').trim().toLowerCase();
   const password = req.body.password;
 
-  if (!username || !email || !password) {
-    return res.status(400).send('All fields are required. <a href="/">Back</a>');
+  if (!username || !email || !password) return res.redirect('/auth');
+
+  const { data: existing } = await supabase.from('users').select('id').ilike('username', username).maybeSingle();
+  if (existing) {
+    return res.send(renderLayout('Error', `<div class="card" style="text-align:center;"><h3>Username is already claimed</h3><p style="margin:16px 0;"><a href="/auth" class="btn">Try Again</a></p></div>`));
   }
 
-  const users = loadUsers();
-  const key = username.toLowerCase();
+  const { error } = await supabase.from('users').insert({
+    username,
+    email,
+    password_hash: hashPassword(password)
+  });
 
-  if (users[key]) {
-    return res.status(400).send('Username already claimed. <a href="/">Try another or Log In</a>');
-  }
-
-  users[key] = {
-    username: username,
-    email: email,
-    passwordHash: hashPassword(password),
-    registeredAt: Date.now()
-  };
-  saveUsers(users);
+  if (error) return res.status(500).send('Database error: ' + error.message);
 
   req.session.user = username;
-  res.redirect('/');
+  res.redirect('/dashboard');
 });
 
-app.post('/login', (req, res) => {
+// Cloud Login
+app.post('/login', async (req, res) => {
   const username = (req.body.username || '').trim();
   const password = req.body.password;
 
-  const users = loadUsers();
-  const key = username.toLowerCase();
-  const user = users[key];
+  const { data: user } = await supabase.from('users').select('*').ilike('username', username).maybeSingle();
 
-  if (!user || user.passwordHash !== hashPassword(password)) {
-    return res.status(401).send('Invalid username or password. <a href="/">Try again</a>');
+  if (!user || user.password_hash !== hashPassword(password)) {
+    return res.send(renderLayout('Error', `<div class="card" style="text-align:center;"><h3>Incorrect username or password</h3><p style="margin:16px 0;"><a href="/auth" class="btn">Back to Login</a></p></div>`));
   }
 
   req.session.user = user.username;
-  res.redirect('/');
+  res.redirect('/dashboard');
 });
 
 app.get('/logout', (req, res) => {
@@ -252,82 +271,105 @@ app.get('/logout', (req, res) => {
   res.redirect('/');
 });
 
-// Handle cosmetic uploads
-app.post('/upload', (req, res, next) => {
-  if (!req.session || !req.session.user) {
-    return res.status(401).redirect('/');
-  }
-  next();
-}, upload.fields([{ name: 'skin', maxCount: 1 }, { name: 'cape', maxCount: 1 }]), (req, res) => {
-  const username = req.session.user.toLowerCase();
-  const model = req.body.model === 'slim' ? 'slim' : 'default';
+// 4. Cosmetics Studio
+app.get('/dashboard', async (req, res) => {
+  if (!req.session || !req.session.user) return res.redirect('/auth');
 
-  fs.writeFileSync(path.join('uploads', `${username}_meta.json`), JSON.stringify({ model }));
+  const { data: user } = await supabase.from('users').select('*').ilike('username', req.session.user).maybeSingle();
+  const skinExists = !!(user && user.skin_url);
+  const capeExists = !!(user && user.cape_url);
 
-  res.send(`
-    <body style="font-family:sans-serif;background:#0f1117;color:#fff;text-align:center;padding-top:50px;">
-      <h3>Updated cosmetics for <b>${req.session.user}</b>!</h3>
-      <p style="color:#9ca3af;">Launch AksuLauncher with username "${req.session.user}" to view your skin & cape in-game.</p>
-      <a href="/" style="color:#3b82f6;text-decoration:none;">Dashboard</a>
-    </body>
-  `);
+  const content = `
+    <div style="max-width: 650px; margin: 0 auto;">
+      <h2 style="font-size: 2rem; margin-bottom: 8px;">Cosmetics Studio</h2>
+      <p style="color: var(--dim); margin-bottom: 24px;">Configuring permanent cloud cosmetics for <b>${req.session.user}</b>.</p>
+
+      <div class="card">
+        <form action="/upload" method="post" enctype="multipart/form-data">
+          <label style="display:block; font-size: 0.9rem; font-weight: 600; margin-bottom: 6px;">Skin Model Type</label>
+          <select name="model" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:#0b0d13; color:#fff; margin-bottom:18px;">
+            <option value="default" ${user && user.model === 'default' ? 'selected' : ''}>Classic 4-pixel arm (Steve)</option>
+            <option value="slim" ${user && user.model === 'slim' ? 'selected' : ''}>Slim 3-pixel arm (Alex)</option>
+          </select>
+
+          <label style="display:block; font-size: 0.9rem; font-weight: 600; margin-bottom: 6px;">Skin Texture (.png)</label>
+          <input type="file" name="skin" style="width:100%; margin-bottom:6px; color: var(--dim);">
+          <div style="font-size: 0.8rem; color: ${skinExists ? '#22c55e' : '#9ca3af'}; margin-bottom: 18px;">
+            ${skinExists ? '✓ Cloud-synced skin active' : 'No custom skin set'}
+          </div>
+
+          <label style="display:block; font-size: 0.9rem; font-weight: 600; margin-bottom: 6px;">Cape & Elytra (.png, optional)</label>
+          <input type="file" name="cape" style="width:100%; margin-bottom:6px; color: var(--dim);">
+          <div style="font-size: 0.8rem; color: ${capeExists ? '#22c55e' : '#9ca3af'}; margin-bottom: 24px;">
+            ${capeExists ? '✓ Cloud-synced cape active' : 'No cape set'}
+          </div>
+
+          <button type="submit" class="btn" style="width: 100%; padding: 12px; font-size: 1rem;">Save to Cloud</button>
+        </form>
+      </div>
+    </div>
+  `;
+  res.send(renderLayout('Dashboard', content, req.session.user));
 });
 
-// Yggdrasil Session Profile endpoint (Skin + Cape + Elytra)
-app.get('/sessionserver/session/minecraft/profile/:uuid', (req, res) => {
+// Upload direct to Supabase Storage
+app.post('/upload', upload.fields([{ name: 'skin', maxCount: 1 }, { name: 'cape', maxCount: 1 }]), async (req, res) => {
+  if (!req.session || !req.session.user) return res.redirect('/auth');
+
+  const username = req.session.user;
+  const model = req.body.model === 'slim' ? 'slim' : 'default';
+  const updates = { model };
+
+  if (req.files && req.files['skin'] && req.files['skin'][0]) {
+    const file = req.files['skin'][0];
+    const filePath = `skins/${username.toLowerCase()}_${Date.now()}.png`;
+    const { data } = await supabase.storage.from('cosmetics').upload(filePath, file.buffer, { contentType: 'image/png', upsert: true });
+    if (data) {
+      const { data: publicData } = supabase.storage.from('cosmetics').getPublicUrl(filePath);
+      updates.skin_url = publicData.publicUrl;
+    }
+  }
+
+  if (req.files && req.files['cape'] && req.files['cape'][0]) {
+    const file = req.files['cape'][0];
+    const filePath = `capes/${username.toLowerCase()}_${Date.now()}.png`;
+    const { data } = await supabase.storage.from('cosmetics').upload(filePath, file.buffer, { contentType: 'image/png', upsert: true });
+    if (data) {
+      const { data: publicData } = supabase.storage.from('cosmetics').getPublicUrl(filePath);
+      updates.cape_url = publicData.publicUrl;
+    }
+  }
+
+  await supabase.from('users').update(updates).ilike('username', username);
+  res.redirect('/dashboard');
+});
+
+// 5. Yggdrasil API Session profile for launcher
+app.get('/sessionserver/session/minecraft/profile/:uuid', async (req, res) => {
   const uuid = req.params.uuid.replace(/-/g, '').toLowerCase();
 
-  const files = fs.readdirSync('uploads');
-  let matchedUser = null;
+  const { data: users } = await supabase.from('users').select('*');
+  if (!users) return res.status(204).end();
 
-  for (const f of files) {
-    if (f.endsWith('_skin.png') || f.endsWith('_cape.png')) {
-      const user = f.replace(/_(skin|cape)\.png$/, '');
-      if (getOfflineUUID(user) === uuid) {
-        matchedUser = user;
-        break;
-      }
-    }
+  const matchedUser = users.find(u => getOfflineUUID(u.username) === uuid);
+  if (!matchedUser || (!matchedUser.skin_url && !matchedUser.cape_url)) {
+    return res.status(204).end();
   }
 
-  if (!matchedUser) return res.status(204).end();
-
-  const host = req.get('host');
-  const protocol = req.protocol;
   const textures = {};
-
-  // Check skin
-  const skinPath = path.join('uploads', `${matchedUser}_skin.png`);
-  if (fs.existsSync(skinPath)) {
-    let model = 'default';
-    const metaPath = path.join('uploads', `${matchedUser}_meta.json`);
-    if (fs.existsSync(metaPath)) {
-      try {
-        model = JSON.parse(fs.readFileSync(metaPath, 'utf8')).model || 'default';
-      } catch (e) {}
-    }
-
-    textures.SKIN = {
-      url: `${protocol}://${host}/textures/${matchedUser}_skin.png`
-    };
-    if (model === 'slim') {
-      textures.SKIN.metadata = { model: 'slim' };
-    }
+  if (matchedUser.skin_url) {
+    textures.SKIN = { url: matchedUser.skin_url };
+    if (matchedUser.model === 'slim') textures.SKIN.metadata = { model: 'slim' };
   }
-
-  // Check cape (Minecraft automatically maps this to elytra)
-  const capePath = path.join('uploads', `${matchedUser}_cape.png`);
-  if (fs.existsSync(capePath)) {
-    textures.CAPE = {
-      url: `${protocol}://${host}/textures/${matchedUser}_cape.png`
-    };
+  if (matchedUser.cape_url) {
+    textures.CAPE = { url: matchedUser.cape_url };
   }
 
   const textureData = {
     timestamp: Date.now(),
     profileId: uuid,
-    profileName: matchedUser,
-    textures: textures
+    profileName: matchedUser.username,
+    textures
   };
 
   const base64Textures = Buffer.from(JSON.stringify(textureData)).toString('base64');
@@ -337,15 +379,9 @@ app.get('/sessionserver/session/minecraft/profile/:uuid', (req, res) => {
 
   res.json({
     id: uuid,
-    name: matchedUser,
-    properties: [
-      {
-        name: 'textures',
-        value: base64Textures,
-        signature: signature
-      }
-    ]
+    name: matchedUser.username,
+    properties: [{ name: 'textures', value: base64Textures, signature }]
   });
 });
 
-app.listen(PORT, () => console.log(`AksuLauncher Skin & Cape Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`AksuLauncher Portal connected to Supabase on port ${PORT}`));
