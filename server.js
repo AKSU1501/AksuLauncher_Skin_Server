@@ -66,7 +66,6 @@ function renderLayout(title, content, activeUser = null) {
         --bg-surface: #12151f;
         --bg-card: #181c2a;
         --border: #24293d;
-        --border-focus: #3b82f6;
         --accent: #3b82f6;
         --accent-hover: #2563eb;
         --accent-glow: rgba(59, 130, 246, 0.35);
@@ -91,7 +90,6 @@ function renderLayout(title, content, activeUser = null) {
       .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
       footer { border-top: 1px solid var(--border); text-align: center; padding: 24px; color: var(--text-muted); font-size: 0.85rem; }
       
-      /* Toast notification */
       #toast { position: fixed; bottom: 28px; right: 28px; background: #1e293b; border: 1px solid var(--border); color: #fff; padding: 14px 22px; border-radius: 12px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 12px; transform: translateY(120%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 1000; }
       #toast.show { transform: translateY(0); }
       #toast.success { border-color: var(--success); }
@@ -303,7 +301,7 @@ app.get('/logout', (req, res) => {
   res.redirect('/');
 });
 
-// 4. Interactive 3D Cosmetics Studio
+// 4. Interactive 3D Studio with Individual Toggles
 app.get('/dashboard', async (req, res) => {
   if (!req.session || !req.session.user) return res.redirect('/auth');
 
@@ -314,13 +312,49 @@ app.get('/dashboard', async (req, res) => {
 
   const content = `
     <style>
-      .studio-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 28px; }
+      .studio-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 28px; }
       @media(max-width: 860px) { .studio-grid { grid-template-columns: 1fr; } }
-      .viewer-box { background: #0c0f17; border: 1px solid var(--border); border-radius: 16px; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 440px; }
+      .viewer-box { background: #0c0f17; border: 1px solid var(--border); border-radius: 16px; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 480px; }
+      
+      .view-selector-bar {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        right: 16px;
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        z-index: 10;
+        background: rgba(18, 21, 31, 0.75);
+        backdrop-filter: blur(10px);
+        padding: 5px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+      }
+      .view-tab {
+        background: transparent;
+        border: none;
+        color: var(--text-muted);
+        padding: 7px 14px;
+        border-radius: 8px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.2s;
+        flex: 1;
+        text-align: center;
+      }
+      .view-tab.active {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 2px 10px var(--accent-glow);
+      }
+
       .viewer-controls { position: absolute; bottom: 16px; left: 16px; right: 16px; display: flex; justify-content: center; gap: 8px; z-index: 10; flex-wrap: wrap; }
       .pill-btn { background: rgba(24, 28, 42, 0.85); backdrop-filter: blur(8px); border: 1px solid var(--border); color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
       .pill-btn.active { background: var(--accent); border-color: var(--accent); }
-      .file-dropzone { border: 2px dashed var(--border); border-radius: 12px; padding: 20px; text-align: center; cursor: pointer; transition: all 0.2s; background: #0e111a; margin-top: 8px; }
+      
+      .file-dropzone { border: 2px dashed var(--border); border-radius: 12px; padding: 18px; text-align: center; cursor: pointer; transition: all 0.2s; background: #0e111a; margin-top: 6px; }
       .file-dropzone:hover { border-color: var(--accent); background: #121624; }
       .upload-progress { height: 6px; background: #24293d; border-radius: 4px; overflow: hidden; margin-top: 16px; display: none; }
       .progress-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.3s ease; }
@@ -339,10 +373,18 @@ app.get('/dashboard', async (req, res) => {
     <div class="studio-grid">
       <!-- 3D Canvas Box -->
       <div class="viewer-box">
+        <!-- Selective 3D View Mode Selector -->
+        <div class="view-selector-bar">
+          <button type="button" class="view-tab active" onclick="switchView('full')">Full Player</button>
+          <button type="button" class="view-tab" onclick="switchView('skin')">Skin Only</button>
+          <button type="button" class="view-tab" onclick="switchView('cape')">Cape 3D</button>
+          <button type="button" class="view-tab" onclick="switchView('elytra')">Elytra 3D</button>
+        </div>
+
         <canvas id="skin_container"></canvas>
+
         <div class="viewer-controls">
           <button type="button" class="pill-btn active" id="btnAnim" onclick="toggleAnimation()">Walk Anim: ON</button>
-          <button type="button" class="pill-btn" id="btnEquip" onclick="toggleEquipment()">Mode: Cape</button>
           <button type="button" class="pill-btn" onclick="resetCamera()">Reset View</button>
         </div>
       </div>
@@ -351,7 +393,7 @@ app.get('/dashboard', async (req, res) => {
       <div class="card">
         <form id="cosmeticsForm">
           <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Arm Geometry Model</label>
-          <select id="modelSelector" name="model" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:#0c0e14; color:#fff; margin-bottom:20px; font-size: 0.95rem;">
+          <select id="modelSelector" name="model" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:#0c0e14; color:#fff; margin-bottom:18px; font-size: 0.95rem;">
             <option value="default" ${modelType === 'default' ? 'selected' : ''}>Classic 4-pixel (Steve)</option>
             <option value="slim" ${modelType === 'slim' ? 'selected' : ''}>Slim 3-pixel (Alex)</option>
           </select>
@@ -365,7 +407,7 @@ app.get('/dashboard', async (req, res) => {
           </div>
 
           <!-- Cape Input -->
-          <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-top: 20px; margin-bottom: 6px;">Cape & Elytra (.png)</label>
+          <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-top: 18px; margin-bottom: 6px;">Cape & Elytra (.png)</label>
           <div class="file-dropzone" onclick="document.getElementById('capeInput').click()">
             <div id="capeLabel" style="font-size: 0.9rem; color: #fff;">${capeUrl ? '✓ Custom Cape Loaded' : 'Tap to select cape PNG'}</div>
             <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Standard Minecraft cape layout</div>
@@ -376,7 +418,7 @@ app.get('/dashboard', async (req, res) => {
             <div class="progress-fill" id="progressBar"></div>
           </div>
 
-          <button type="submit" id="saveBtn" class="btn" style="width:100%; margin-top:24px; padding:14px;">
+          <button type="submit" id="saveBtn" class="btn" style="width:100%; margin-top:22px; padding:14px;">
             Save to Cloud
           </button>
         </form>
@@ -384,22 +426,72 @@ app.get('/dashboard', async (req, res) => {
     </div>
 
     <script>
-      // 3D Engine Setup
+      const defaultSkin = "https://textures.minecraft.net/texture/31f477eb1a7beee631c2ca64d06f0f6fa9ff2cf93ae9cf745fca20ba5979f8a6";
+      let activeSkinUrl = "${skinUrl}" || defaultSkin;
+      let activeCapeUrl = "${capeUrl}";
+      let currentMode = "full";
+
       const canvas = document.getElementById("skin_container");
       const skinViewer = new skinview3d.SkinViewer({
         canvas: canvas,
         width: 320,
-        height: 400,
-        skin: "${skinUrl || 'https://textures.minecraft.net/texture/31f477eb1a7beee631c2ca64d06f0f6fa9ff2cf93ae9cf745fca20ba5979f8a6'}"
+        height: 420,
+        skin: activeSkinUrl
       });
 
-      let currentCape = "${capeUrl}";
-      let currentEquip = 'cape';
       let isWalking = true;
       let walkAnim = skinViewer.animations.add(skinview3d.WalkingAnimation);
 
-      if (currentCape) {
-        skinViewer.loadCape(currentCape, { backEquipment: currentEquip });
+      if (activeCapeUrl) {
+        skinViewer.loadCape(activeCapeUrl, { backEquipment: 'cape' });
+      }
+
+      // Helper to show/hide the player model mesh
+      function setPlayerBodyVisibility(visible) {
+        if (skinViewer.playerObject && skinViewer.playerObject.skin) {
+          skinViewer.playerObject.skin.visible = visible;
+        }
+      }
+
+      // Switch View: 'full', 'skin', 'cape', 'elytra'
+      function switchView(mode) {
+        currentMode = mode;
+        document.querySelectorAll('.view-tab').forEach(b => b.classList.remove('active'));
+        event.target.classList.add('active');
+
+        if (mode === 'full') {
+          setPlayerBodyVisibility(true);
+          if (activeCapeUrl) {
+            skinViewer.loadCape(activeCapeUrl, { backEquipment: 'cape' });
+          }
+          resetCamera();
+        } else if (mode === 'skin') {
+          setPlayerBodyVisibility(true);
+          skinViewer.loadCape(null);
+          resetCamera();
+        } else if (mode === 'cape') {
+          if (!activeCapeUrl) {
+            showToast('Please upload or select a Cape first to inspect it in 3D.', 'info');
+          }
+          setPlayerBodyVisibility(false);
+          skinViewer.loadCape(activeCapeUrl || defaultSkin, { backEquipment: 'cape' });
+          // Rotate camera to show back of cape clearly
+          skinViewer.camera.position.x = 0;
+          skinViewer.camera.position.y = 0;
+          skinViewer.camera.position.z = -55;
+          skinViewer.controls.reset();
+        } else if (mode === 'elytra') {
+          if (!activeCapeUrl) {
+            showToast('Please upload or select a Cape first to inspect Elytra 3D.', 'info');
+          }
+          setPlayerBodyVisibility(false);
+          skinViewer.loadCape(activeCapeUrl || defaultSkin, { backEquipment: 'elytra' });
+          // Angled camera to show wings
+          skinViewer.camera.position.x = 25;
+          skinViewer.camera.position.y = 10;
+          skinViewer.camera.position.z = -55;
+          skinViewer.controls.reset();
+        }
       }
 
       // Model Switcher
@@ -413,9 +505,11 @@ app.get('/dashboard', async (req, res) => {
         if (file) {
           const reader = new FileReader();
           reader.onload = function(evt) {
-            skinViewer.loadSkin(evt.target.result, { model: document.getElementById('modelSelector').value });
+            activeSkinUrl = evt.target.result;
+            skinViewer.loadSkin(activeSkinUrl, { model: document.getElementById('modelSelector').value });
+            setPlayerBodyVisibility(true);
             document.getElementById('skinLabel').innerText = 'Selected: ' + file.name;
-            showToast('Previewing new skin locally!', 'info');
+            showToast('Previewing skin texture locally!', 'info');
           };
           reader.readAsDataURL(file);
         }
@@ -427,10 +521,11 @@ app.get('/dashboard', async (req, res) => {
         if (file) {
           const reader = new FileReader();
           reader.onload = function(evt) {
-            currentCape = evt.target.result;
-            skinViewer.loadCape(currentCape, { backEquipment: currentEquip });
+            activeCapeUrl = evt.target.result;
+            const equip = (currentMode === 'elytra') ? 'elytra' : 'cape';
+            skinViewer.loadCape(activeCapeUrl, { backEquipment: equip });
             document.getElementById('capeLabel').innerText = 'Selected: ' + file.name;
-            showToast('Previewing new cape locally!', 'info');
+            showToast('Previewing cape / elytra locally!', 'info');
           };
           reader.readAsDataURL(file);
         }
@@ -452,16 +547,6 @@ app.get('/dashboard', async (req, res) => {
         }
       }
 
-      // Elytra / Cape Toggle
-      function toggleEquipment() {
-        const btn = document.getElementById('btnEquip');
-        currentEquip = currentEquip === 'cape' ? 'elytra' : 'cape';
-        btn.innerText = currentEquip === 'cape' ? 'Mode: Cape' : 'Mode: Elytra';
-        if (currentCape) {
-          skinViewer.loadCape(currentCape, { backEquipment: currentEquip });
-        }
-      }
-
       function resetCamera() {
         skinViewer.camera.position.x = 0;
         skinViewer.camera.position.y = 0;
@@ -469,7 +554,7 @@ app.get('/dashboard', async (req, res) => {
         skinViewer.controls.reset();
       }
 
-      // AJAX Upload with Progress & Instant Feedback
+      // AJAX Upload with Progress Feedback
       document.getElementById('cosmeticsForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const btn = document.getElementById('saveBtn');
@@ -519,7 +604,6 @@ app.get('/dashboard', async (req, res) => {
         xhr.send(formData);
       });
 
-      // Show welcome toast if just registered
       if (new URLSearchParams(window.location.search).get('registered')) {
         showToast('Account registered successfully!', 'success');
       }
