@@ -113,7 +113,6 @@ app.get('/', (req, res) => {
           label { display: block; margin-top: 12px; margin-bottom: 6px; font-size: 0.85rem; color: #9ca3af; }
           input { width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #2e3446; background: #0f1117; color: #fff; box-sizing: border-box; }
           button { width: 100%; margin-top: 18px; padding: 11px; border: none; border-radius: 6px; background: #3b82f6; color: #fff; font-weight: 600; cursor: pointer; }
-          button.secondary { background: #374151; margin-top: 8px; }
           .toggle { text-align: center; margin-top: 16px; font-size: 0.85rem; color: #9ca3af; }
           .toggle a { color: #60a5fa; cursor: pointer; text-decoration: none; }
         </style>
@@ -188,11 +187,11 @@ app.get('/', (req, res) => {
             <option value="slim">Slim 3px (Alex)</option>
           </select>
 
-          <label>Skin Texture (.png)</label>
-          <input type="file" name="skin" accept=".png">
+          <label>Skin Texture</label>
+          <input type="file" name="skin" accept="image/*">
 
-          <label>Cape / Elytra (.png, optional)</label>
-          <input type="file" name="cape" accept=".png">
+          <label>Cape / Elytra (optional)</label>
+          <input type="file" name="cape" accept="image/*">
 
           <button type="submit">Save Cosmetics</button>
         </form>
@@ -316,7 +315,7 @@ app.get('/sessionserver/session/minecraft/profile/:uuid', (req, res) => {
     }
   }
 
-  // Check cape
+  // Check cape (Minecraft automatically maps this to elytra)
   const capePath = path.join('uploads', `${matchedUser}_cape.png`);
   if (fs.existsSync(capePath)) {
     textures.CAPE = {
