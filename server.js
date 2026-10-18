@@ -14,7 +14,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://rtfuamnwfrtyitxbakrl.s
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0ZnVhbW53ZnJ0eWl0eGJha3JsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzMzY0ODgsImV4cCI6MjEwNzkxMjQ4OH0.treB5Pf3sA_07z5v20RnZXz5flHWdNg3RrpbR_sQEIY';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// RSA Keypair setup
+// RSA Keypair setup for authlib-injector
 if (!fs.existsSync('keys')) fs.mkdirSync('keys');
 if (!fs.existsSync('keys/private.pem')) {
   const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
@@ -57,47 +57,125 @@ function renderLayout(title, content, activeUser = null) {
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${title} | AksuLauncher Studio</title>
+    <title>${title} | AksuLauncher</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/skinview3d@3.0.1/bundles/skinview3d.bundle.js"></script>
     <style>
       :root {
-        --bg-deep: #090b10;
-        --bg-surface: #12151f;
-        --bg-card: #181c2a;
-        --border: #24293d;
+        --bg-deep: #080a0f;
+        --bg-surface: #0f131d;
+        --bg-card: rgba(22, 27, 40, 0.7);
+        --border: #232a3d;
         --accent: #3b82f6;
         --accent-hover: #2563eb;
-        --accent-glow: rgba(59, 130, 246, 0.35);
+        --accent-glow: rgba(59, 130, 246, 0.4);
         --text: #f8fafc;
         --text-muted: #94a3b8;
         --success: #10b981;
       }
       * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
-      body { background-color: var(--bg-deep); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
-      nav { background: rgba(18, 21, 31, 0.85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; padding: 16px 32px; position: sticky; top: 0; z-index: 100; }
-      .brand { font-size: 1.3rem; font-weight: 800; color: #fff; text-decoration: none; letter-spacing: -0.5px; }
+      body {
+        background-color: var(--bg-deep);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background-image: 
+          radial-gradient(circle at 15% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 40%),
+          radial-gradient(circle at 85% 65%, rgba(139, 92, 246, 0.07) 0%, transparent 40%);
+        background-attachment: fixed;
+      }
+      nav {
+        background: rgba(15, 19, 29, 0.82);
+        backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 16px 32px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 1.25rem;
+        font-weight: 800;
+        color: #fff;
+        text-decoration: none;
+        letter-spacing: -0.5px;
+      }
+      .brand img { width: 32px; height: 32px; border-radius: 6px; }
       .brand span { color: var(--accent); }
       .nav-links { display: flex; gap: 24px; align-items: center; }
       .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.95rem; font-weight: 600; transition: color 0.2s; }
       .nav-links a:hover { color: #fff; }
-      .btn { background: var(--accent); color: #fff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 700; font-size: 0.95rem; border: none; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 16px var(--accent-glow); }
-      .btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
-      .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-      .btn-secondary { background: #24293d; color: var(--text); box-shadow: none; }
-      .btn-secondary:hover { background: #2f3650; }
-      .container { max-width: 1100px; margin: 0 auto; padding: 36px 20px; flex: 1; width: 100%; }
-      .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
-      footer { border-top: 1px solid var(--border); text-align: center; padding: 24px; color: var(--text-muted); font-size: 0.85rem; }
       
-      #toast { position: fixed; bottom: 28px; right: 28px; background: #1e293b; border: 1px solid var(--border); color: #fff; padding: 14px 22px; border-radius: 12px; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: flex; align-items: center; gap: 12px; transform: translateY(120%); transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); z-index: 1000; }
+      .btn {
+        background: var(--accent);
+        color: #fff;
+        padding: 12px 24px;
+        border-radius: 12px;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.95rem;
+        border: none;
+        cursor: pointer;
+        transition: all 0.25s ease;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        box-shadow: 0 4px 18px var(--accent-glow);
+      }
+      .btn:hover { background: var(--accent-hover); transform: translateY(-2px); box-shadow: 0 6px 24px rgba(59, 130, 246, 0.55); }
+      .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+      .btn-secondary { background: rgba(35, 42, 61, 0.8); border: 1px solid var(--border); color: var(--text); box-shadow: none; }
+      .btn-secondary:hover { background: rgba(45, 54, 78, 1); }
+      
+      .container { max-width: 1140px; margin: 0 auto; padding: 40px 20px; flex: 1; width: 100%; }
+      .card {
+        background: var(--bg-card);
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        padding: 32px;
+        box-shadow: 0 16px 40px rgba(0,0,0,0.3);
+      }
+      footer { border-top: 1px solid var(--border); text-align: center; padding: 28px; color: var(--text-muted); font-size: 0.85rem; }
+      
+      /* Toast notification */
+      #toast {
+        position: fixed;
+        bottom: 28px;
+        right: 28px;
+        background: #151a28;
+        border: 1px solid var(--border);
+        color: #fff;
+        padding: 14px 24px;
+        border-radius: 14px;
+        font-weight: 600;
+        box-shadow: 0 12px 36px rgba(0,0,0,0.6);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        transform: translateY(140%);
+        transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        z-index: 1000;
+      }
       #toast.show { transform: translateY(0); }
       #toast.success { border-color: var(--success); }
     </style>
   </head>
   <body>
     <nav>
-      <a href="/" class="brand">AKSU<span>LAUNCHER</span></a>
+      <a href="/" class="brand">
+        <img src="https://raw.githubusercontent.com/PrismLauncher/PrismLauncher/develop/launcher/resources/multimc/scalable/multimc.svg" alt="Icon">
+        AKSU<span>LAUNCHER</span>
+      </a>
       <div class="nav-links">
         <a href="/">Home</a>
         <a href="/downloads">Download APK</a>
@@ -108,7 +186,7 @@ function renderLayout(title, content, activeUser = null) {
     </nav>
     <div class="container">${content}</div>
     <div id="toast"></div>
-    <footer>&copy; 2026 AksuLauncher &bull; Powered by Supabase & AKSU1501</footer>
+    <footer>&copy; 2026 AksuLauncher &bull; Built for Android &bull; Powered by Supabase Cloud</footer>
 
     <script>
       function showToast(message, type = 'info') {
@@ -123,7 +201,7 @@ function renderLayout(title, content, activeUser = null) {
   </html>`;
 }
 
-// 1. Landing Page
+// 1. Interactive Landing Page
 app.get('/', (req, res) => {
   if (req.headers.accept && req.headers.accept.includes('application/json')) {
     return res.json({
@@ -134,83 +212,171 @@ app.get('/', (req, res) => {
   }
 
   const content = `
-    <div style="text-align: center; padding: 50px 0 30px;">
-      <h1 style="font-size: 3rem; font-weight: 800; margin-bottom: 16px; letter-spacing: -1px;">
-        Minecraft Java for Android.<br><span style="color: var(--accent);">Interactive 3D Cosmetics.</span>
+    <!-- Hero Banner -->
+    <div style="text-align: center; padding: 60px 0 50px; position: relative;">
+      <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; padding: 6px 16px; border-radius: 30px; font-size: 0.85rem; font-weight: 700; margin-bottom: 24px;">
+        🚀 Optimized for Samsung Galaxy Tab S9 FE & Android Devices
+      </div>
+      <h1 style="font-size: 3.4rem; font-weight: 800; margin-bottom: 20px; letter-spacing: -1.5px; line-height: 1.15;">
+        Play Minecraft Java on Android.<br>
+        <span style="background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+          Custom Capes, Elytras & Skins.
+        </span>
       </h1>
-      <p style="color: var(--text-muted); font-size: 1.15rem; max-width: 620px; margin: 0 auto 32px; line-height: 1.6;">
-        Live real-time cape, elytra, and skin preview engine synced directly to AksuLauncher with zero database wipes.
+      <p style="color: var(--text-muted); font-size: 1.2rem; max-width: 680px; margin: 0 auto 36px; line-height: 1.6;">
+        A high-performance Java Launcher running OpenJDK 17 with an integrated 3D cosmetics studio. Zero cloud resets, instant sync.
       </p>
-      <div style="display: flex; justify-content: center; gap: 16px;">
-        <a href="/downloads" class="btn">Download AksuLauncher APK</a>
-        <a href="/auth" class="btn btn-secondary">Open Cosmetics Studio</a>
+      <div style="display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;">
+        <a href="/downloads" class="btn" style="padding: 15px 32px; font-size: 1.05rem;">
+          📥 Download AksuLauncher APK
+        </a>
+        <a href="/auth" class="btn btn-secondary" style="padding: 15px 32px; font-size: 1.05rem;">
+          🎨 Open 3D Wardrobe
+        </a>
+      </div>
+    </div>
+
+    <!-- Feature Grid with Images & Assets -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-top: 30px;">
+      <div class="card">
+        <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 14px;">
+          <div style="background: rgba(59, 130, 246, 0.15); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+            <img src="https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/26a1.png" style="width: 28px; height: 28px;">
+          </div>
+          <h3 style="font-size: 1.25rem; font-weight: 700;">Desktop Performance</h3>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.6;">
+          Native ARM64 OpenJDK execution with hardware-accelerated Vulkan & OpenGL (Zink / VirGL / HolyGL) drivers tailored for modern tablets.
+        </p>
+      </div>
+
+      <div class="card">
+        <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 14px;">
+          <div style="background: rgba(168, 85, 247, 0.15); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+            <img src="https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1fa9d.png" style="width: 28px; height: 28px;">
+          </div>
+          <h3 style="font-size: 1.25rem; font-weight: 700;">3D Cape & Elytra Rendering</h3>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.6;">
+          Full support for custom animated capes and gliding Elytra wings using cryptographic Yggdrasil signatures via authlib-injector.
+        </p>
+      </div>
+
+      <div class="card">
+        <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 14px;">
+          <div style="background: rgba(16, 185, 129, 0.15); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+            <img src="https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f512.png" style="width: 28px; height: 28px;">
+          </div>
+          <h3 style="font-size: 1.25rem; font-weight: 700;">Zero Data Wipes</h3>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.6;">
+          All user profiles, usernames, and skin files are permanently stored in an enterprise PostgreSQL and S3 cloud bucket powered by Supabase.
+        </p>
       </div>
     </div>
   `;
   res.send(renderLayout('Home', content, req.session ? req.session.user : null));
 });
 
-// 2. APK Downloads Page
+// 2. Download Center with Detailed Device Specs
 app.get('/downloads', (req, res) => {
   const content = `
-    <div style="max-width: 650px; margin: 0 auto;">
-      <h2 style="font-size: 2rem; margin-bottom: 8px;">Download Center</h2>
-      <p style="color: var(--text-muted); margin-bottom: 24px;">Grab the latest compiled APK for your tablet.</p>
-      <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <div style="font-weight: 700; font-size: 1.1rem;">AksuLauncher (Android Build)</div>
-            <div style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">OpenJDK 17 &bull; Custom Cosmetics Sync Enabled</div>
+    <div style="max-width: 780px; margin: 0 auto;">
+      <div style="text-align: center; margin-bottom: 36px;">
+        <h2 style="font-size: 2.4rem; font-weight: 800; letter-spacing: -0.5px;">Download AksuLauncher</h2>
+        <p style="color: var(--text-muted); font-size: 1.05rem; margin-top: 8px;">Install the latest Java runtime environment on your Android device.</p>
+      </div>
+
+      <div class="card" style="margin-bottom: 24px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+          <div style="display: flex; gap: 18px; align-items: center;">
+            <img src="https://raw.githubusercontent.com/PrismLauncher/PrismLauncher/develop/launcher/resources/multimc/scalable/multimc.svg" style="width: 54px; height: 54px;">
+            <div>
+              <div style="font-weight: 800; font-size: 1.3rem;">AksuLauncher v3 (Latest Action Build)</div>
+              <div style="color: #10b981; font-weight: 700; font-size: 0.85rem; margin-top: 4px;">● Verified Stable &bull; OpenJDK 17 + JRE 21</div>
+            </div>
           </div>
-          <a href="https://github.com/AKSU1501/AksuLauncher/actions" target="_blank" class="btn" style="padding: 10px 20px;">Download</a>
+          <a href="https://github.com/AKSU1501/AksuLauncher/actions" target="_blank" class="btn" style="padding: 14px 26px;">
+            📥 Download Latest Build
+          </a>
         </div>
+
+        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; text-align: center;">
+          <div style="background: rgba(15, 19, 29, 0.6); padding: 12px; border-radius: 12px; border: 1px solid var(--border);">
+            <div style="color: var(--text-muted); font-size: 0.75rem; font-weight: 700;">PLATFORM</div>
+            <div style="font-weight: 800; font-size: 0.95rem; margin-top: 4px;">Android 8.0+</div>
+          </div>
+          <div style="background: rgba(15, 19, 29, 0.6); padding: 12px; border-radius: 12px; border: 1px solid var(--border);">
+            <div style="color: var(--text-muted); font-size: 0.75rem; font-weight: 700;">ARCHITECTURE</div>
+            <div style="font-weight: 800; font-size: 0.95rem; margin-top: 4px;">ARM64 / AArch64</div>
+          </div>
+          <div style="background: rgba(15, 19, 29, 0.6); padding: 12px; border-radius: 12px; border: 1px solid var(--border);">
+            <div style="color: var(--text-muted); font-size: 0.75rem; font-weight: 700;">MINECRAFT</div>
+            <div style="font-weight: 800; font-size: 0.95rem; margin-top: 4px;">1.7.10 to 1.21+</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Install Guide -->
+      <div class="card">
+        <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 14px;">📋 Installation Instructions</h3>
+        <ol style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.8; padding-left: 20px;">
+          <li>Tap <b>Download Latest Build</b> to open GitHub Actions artifacts.</li>
+          <li>Install the compiled APK on your device.</li>
+          <li>Open AksuLauncher and add a Local/Offline account matching your website username.</li>
+          <li>Your cloud skins, capes, and Elytras will automatically render inside the game.</li>
+        </ol>
       </div>
     </div>
   `;
   res.send(renderLayout('Downloads', content, req.session ? req.session.user : null));
 });
 
-// 3. Auth Page
+// 3. Auth Page (Real-Time Availability Check)
 app.get('/auth', (req, res) => {
   if (req.session && req.session.user) return res.redirect('/dashboard');
 
   const content = `
-    <div style="max-width: 440px; margin: 40px auto 0;">
+    <div style="max-width: 440px; margin: 30px auto 0;">
       <div class="card" id="loginBox">
-        <h2 style="font-size: 1.6rem; margin-bottom: 6px;">Sign In</h2>
-        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 22px;">Access your 3D wardrobe & cosmetics.</p>
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h2 style="font-size: 1.7rem; font-weight: 800;">Welcome Back</h2>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 6px;">Sign in to customize your in-game 3D wardrobe.</p>
+        </div>
         <form action="/login" method="post">
-          <label style="display:block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px;">Minecraft Username</label>
+          <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Minecraft Username</label>
           <input type="text" name="username" required style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:#0c0e14; color:#fff; margin-bottom:16px; font-size: 0.95rem;">
           
-          <label style="display:block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px;">Password</label>
+          <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Password</label>
           <input type="password" name="password" required style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:#0c0e14; color:#fff; margin-bottom:24px; font-size: 0.95rem;">
 
-          <button type="submit" class="btn" style="width:100%;">Sign In</button>
+          <button type="submit" class="btn" style="width:100%;">Sign In to Studio</button>
         </form>
         <div style="text-align: center; margin-top: 20px; font-size: 0.9rem; color: var(--text-muted);">
-          Don't have an account? <a onclick="toggleAuth()" style="color: var(--accent); cursor: pointer; font-weight: 600;">Create one</a>
+          Don't have an account? <a onclick="toggleAuth()" style="color: var(--accent); cursor: pointer; font-weight: 700;">Create one</a>
         </div>
       </div>
 
       <div class="card" id="registerBox" style="display: none;">
-        <h2 style="font-size: 1.6rem; margin-bottom: 6px;">Create Account</h2>
-        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 22px;">Reserve your in-game username.</p>
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h2 style="font-size: 1.7rem; font-weight: 800;">Claim Username</h2>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 6px;">Register your exact name to protect your skin & capes.</p>
+        </div>
         <form action="/register" method="post">
-          <label style="display:block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px;">Minecraft Username</label>
-          <input type="text" name="username" id="regUser" onkeyup="checkUsername()" required placeholder="Exact in-game name" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:#0c0e14; color:#fff; margin-bottom:4px; font-size: 0.95rem;">
-          <div id="userFeedback" style="font-size:0.8rem; height: 18px; margin-bottom: 12px; font-weight: 600;"></div>
+          <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Minecraft Username (Exact In-Game)</label>
+          <input type="text" name="username" id="regUser" onkeyup="checkUsername()" required placeholder="e.g. SteveMaster" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:#0c0e14; color:#fff; margin-bottom:4px; font-size: 0.95rem;">
+          <div id="userFeedback" style="font-size:0.8rem; height: 18px; margin-bottom: 12px; font-weight: 700;"></div>
 
-          <label style="display:block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px;">Email Address</label>
+          <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Email Address</label>
           <input type="email" name="email" required style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:#0c0e14; color:#fff; margin-bottom:16px; font-size: 0.95rem;">
 
-          <label style="display:block; font-size: 0.85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px;">Password</label>
+          <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Password</label>
           <input type="password" name="password" required style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:#0c0e14; color:#fff; margin-bottom:24px; font-size: 0.95rem;">
 
-          <button type="submit" id="regBtn" class="btn" style="width:100%;">Register Account</button>
+          <button type="submit" id="regBtn" class="btn" style="width:100%;">Register & Reserve</button>
         </form>
         <div style="text-align: center; margin-top: 20px; font-size: 0.9rem; color: var(--text-muted);">
-          Already claimed? <a onclick="toggleAuth()" style="color: var(--accent); cursor: pointer; font-weight: 600;">Sign In</a>
+          Already claimed? <a onclick="toggleAuth()" style="color: var(--accent); cursor: pointer; font-weight: 700;">Sign In</a>
         </div>
       </div>
     </div>
@@ -232,7 +398,7 @@ app.get('/auth', (req, res) => {
         if (!name) { fb.innerText = ''; return; }
         
         timeout = setTimeout(async () => {
-          fb.innerText = 'Checking...';
+          fb.innerText = 'Checking database...';
           fb.style.color = '#94a3b8';
           const res = await fetch('/api/check-user?username=' + encodeURIComponent(name));
           const data = await res.json();
@@ -249,7 +415,7 @@ app.get('/auth', (req, res) => {
       }
     </script>
   `;
-  res.send(renderLayout('Account', content));
+  res.send(renderLayout('Account Portal', content));
 });
 
 app.get('/api/check-user', async (req, res) => {
@@ -301,7 +467,7 @@ app.get('/logout', (req, res) => {
   res.redirect('/');
 });
 
-// 4. Interactive 3D Studio with Individual Toggles
+// 4. Interactive 3D Cosmetics Studio (Selective View Controls)
 app.get('/dashboard', async (req, res) => {
   if (!req.session || !req.session.user) return res.redirect('/auth');
 
@@ -313,30 +479,43 @@ app.get('/dashboard', async (req, res) => {
   const content = `
     <style>
       .studio-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 28px; }
-      @media(max-width: 860px) { .studio-grid { grid-template-columns: 1fr; } }
-      .viewer-box { background: #0c0f17; border: 1px solid var(--border); border-radius: 16px; position: relative; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 480px; }
+      @media(max-width: 880px) { .studio-grid { grid-template-columns: 1fr; } }
+      
+      .viewer-box {
+        background: radial-gradient(circle at center, #151a28 0%, #090c13 100%);
+        border: 1px solid var(--border);
+        border-radius: 20px;
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 520px;
+        box-shadow: 0 16px 40px rgba(0,0,0,0.4);
+      }
       
       .view-selector-bar {
         position: absolute;
-        top: 16px;
-        left: 16px;
-        right: 16px;
+        top: 18px;
+        left: 18px;
+        right: 18px;
         display: flex;
         justify-content: center;
         gap: 6px;
         z-index: 10;
-        background: rgba(18, 21, 31, 0.75);
-        backdrop-filter: blur(10px);
-        padding: 5px;
-        border-radius: 12px;
+        background: rgba(18, 23, 35, 0.85);
+        backdrop-filter: blur(12px);
+        padding: 6px;
+        border-radius: 14px;
         border: 1px solid var(--border);
       }
       .view-tab {
         background: transparent;
         border: none;
         color: var(--text-muted);
-        padding: 7px 14px;
-        border-radius: 8px;
+        padding: 8px 14px;
+        border-radius: 10px;
         font-size: 0.85rem;
         font-weight: 700;
         cursor: pointer;
@@ -347,25 +526,55 @@ app.get('/dashboard', async (req, res) => {
       .view-tab.active {
         background: var(--accent);
         color: #fff;
-        box-shadow: 0 2px 10px var(--accent-glow);
+        box-shadow: 0 2px 12px var(--accent-glow);
       }
 
-      .viewer-controls { position: absolute; bottom: 16px; left: 16px; right: 16px; display: flex; justify-content: center; gap: 8px; z-index: 10; flex-wrap: wrap; }
-      .pill-btn { background: rgba(24, 28, 42, 0.85); backdrop-filter: blur(8px); border: 1px solid var(--border); color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+      .viewer-controls {
+        position: absolute;
+        bottom: 18px;
+        left: 18px;
+        right: 18px;
+        display: flex;
+        justify-content: center;
+        gap: 8px;
+        z-index: 10;
+        flex-wrap: wrap;
+      }
+      .pill-btn {
+        background: rgba(24, 28, 42, 0.85);
+        backdrop-filter: blur(8px);
+        border: 1px solid var(--border);
+        color: #fff;
+        padding: 7px 16px;
+        border-radius: 20px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
       .pill-btn.active { background: var(--accent); border-color: var(--accent); }
       
-      .file-dropzone { border: 2px dashed var(--border); border-radius: 12px; padding: 18px; text-align: center; cursor: pointer; transition: all 0.2s; background: #0e111a; margin-top: 6px; }
-      .file-dropzone:hover { border-color: var(--accent); background: #121624; }
-      .upload-progress { height: 6px; background: #24293d; border-radius: 4px; overflow: hidden; margin-top: 16px; display: none; }
+      .file-dropzone {
+        border: 2px dashed var(--border);
+        border-radius: 14px;
+        padding: 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.25s;
+        background: rgba(14, 17, 26, 0.6);
+        margin-top: 6px;
+      }
+      .file-dropzone:hover { border-color: var(--accent); background: rgba(20, 26, 42, 0.9); }
+      
+      .upload-progress { height: 6px; background: #232a3d; border-radius: 4px; overflow: hidden; margin-top: 18px; display: none; }
       .progress-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.3s ease; }
     </style>
 
     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
       <div>
         <h2 style="font-size: 2.2rem; font-weight: 800; letter-spacing: -0.5px;">Cosmetics Studio</h2>
-        <p style="color: var(--text-muted); font-size: 0.95rem;">Interactive 3D real-time preview for player <b>${req.session.user}</b></p>
+        <p style="color: var(--text-muted); font-size: 0.95rem;">Interactive 3D preview for player <b style="color:#60a5fa;">${req.session.user}</b></p>
       </div>
-      <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;">
+      <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;">
         ● Supabase Cloud Synced
       </div>
     </div>
@@ -373,7 +582,7 @@ app.get('/dashboard', async (req, res) => {
     <div class="studio-grid">
       <!-- 3D Canvas Box -->
       <div class="viewer-box">
-        <!-- Selective 3D View Mode Selector -->
+        <!-- Selective 3D View Toggles -->
         <div class="view-selector-bar">
           <button type="button" class="view-tab active" onclick="switchView('full')">Full Player</button>
           <button type="button" class="view-tab" onclick="switchView('skin')">Skin Only</button>
@@ -389,28 +598,28 @@ app.get('/dashboard', async (req, res) => {
         </div>
       </div>
 
-      <!-- Settings & Uploads -->
+      <!-- Settings & Form -->
       <div class="card">
         <form id="cosmeticsForm">
           <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Arm Geometry Model</label>
-          <select id="modelSelector" name="model" style="width:100%; padding:12px; border-radius:10px; border:1px solid var(--border); background:#0c0e14; color:#fff; margin-bottom:18px; font-size: 0.95rem;">
-            <option value="default" ${modelType === 'default' ? 'selected' : ''}>Classic 4-pixel (Steve)</option>
-            <option value="slim" ${modelType === 'slim' ? 'selected' : ''}>Slim 3-pixel (Alex)</option>
+          <select id="modelSelector" name="model" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:#0c0e14; color:#fff; margin-bottom:18px; font-size: 0.95rem;">
+            <option value="default" ${modelType === 'default' ? 'selected' : ''}>Classic 4-pixel arm (Steve)</option>
+            <option value="slim" ${modelType === 'slim' ? 'selected' : ''}>Slim 3-pixel arm (Alex)</option>
           </select>
 
-          <!-- Skin Input -->
+          <!-- Skin Selector -->
           <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">Skin Texture (.png)</label>
           <div class="file-dropzone" onclick="document.getElementById('skinInput').click()">
-            <div id="skinLabel" style="font-size: 0.9rem; color: #fff;">${skinUrl ? '✓ Custom Skin Loaded' : 'Tap to select skin PNG'}</div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">64x64 or 64x32 PNG</div>
+            <div id="skinLabel" style="font-size: 0.95rem; font-weight: 600; color: #fff;">${skinUrl ? '✓ Custom Skin Loaded' : 'Select skin PNG'}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">64x64 or 64x32 PNG file</div>
             <input type="file" id="skinInput" name="skin" style="display:none;">
           </div>
 
-          <!-- Cape Input -->
+          <!-- Cape Selector -->
           <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-top: 18px; margin-bottom: 6px;">Cape & Elytra (.png)</label>
           <div class="file-dropzone" onclick="document.getElementById('capeInput').click()">
-            <div id="capeLabel" style="font-size: 0.9rem; color: #fff;">${capeUrl ? '✓ Custom Cape Loaded' : 'Tap to select cape PNG'}</div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Standard Minecraft cape layout</div>
+            <div id="capeLabel" style="font-size: 0.95rem; font-weight: 600; color: #fff;">${capeUrl ? '✓ Custom Cape Loaded' : 'Select cape PNG'}</div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">Standard Minecraft cape texture</div>
             <input type="file" id="capeInput" name="cape" style="display:none;">
           </div>
 
@@ -418,7 +627,7 @@ app.get('/dashboard', async (req, res) => {
             <div class="progress-fill" id="progressBar"></div>
           </div>
 
-          <button type="submit" id="saveBtn" class="btn" style="width:100%; margin-top:22px; padding:14px;">
+          <button type="submit" id="saveBtn" class="btn" style="width:100%; margin-top:24px; padding:15px;">
             Save to Cloud
           </button>
         </form>
@@ -435,7 +644,7 @@ app.get('/dashboard', async (req, res) => {
       const skinViewer = new skinview3d.SkinViewer({
         canvas: canvas,
         width: 320,
-        height: 420,
+        height: 440,
         skin: activeSkinUrl
       });
 
@@ -446,7 +655,6 @@ app.get('/dashboard', async (req, res) => {
         skinViewer.loadCape(activeCapeUrl, { backEquipment: 'cape' });
       }
 
-      // Helper to show/hide the player model mesh
       function setPlayerBodyVisibility(visible) {
         if (skinViewer.playerObject && skinViewer.playerObject.skin) {
           skinViewer.playerObject.skin.visible = visible;
@@ -471,22 +679,20 @@ app.get('/dashboard', async (req, res) => {
           resetCamera();
         } else if (mode === 'cape') {
           if (!activeCapeUrl) {
-            showToast('Please upload or select a Cape first to inspect it in 3D.', 'info');
+            showToast('Select or upload a Cape first to inspect.', 'info');
           }
           setPlayerBodyVisibility(false);
           skinViewer.loadCape(activeCapeUrl || defaultSkin, { backEquipment: 'cape' });
-          // Rotate camera to show back of cape clearly
           skinViewer.camera.position.x = 0;
           skinViewer.camera.position.y = 0;
           skinViewer.camera.position.z = -55;
           skinViewer.controls.reset();
         } else if (mode === 'elytra') {
           if (!activeCapeUrl) {
-            showToast('Please upload or select a Cape first to inspect Elytra 3D.', 'info');
+            showToast('Select or upload a Cape first to inspect Elytra.', 'info');
           }
           setPlayerBodyVisibility(false);
           skinViewer.loadCape(activeCapeUrl || defaultSkin, { backEquipment: 'elytra' });
-          // Angled camera to show wings
           skinViewer.camera.position.x = 25;
           skinViewer.camera.position.y = 10;
           skinViewer.camera.position.z = -55;
@@ -494,12 +700,10 @@ app.get('/dashboard', async (req, res) => {
         }
       }
 
-      // Model Switcher
       document.getElementById('modelSelector').addEventListener('change', (e) => {
         skinViewer.loadSkin(skinViewer.skinUrl, { model: e.target.value });
       });
 
-      // Local Skin Preview
       document.getElementById('skinInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
@@ -515,7 +719,6 @@ app.get('/dashboard', async (req, res) => {
         }
       });
 
-      // Local Cape Preview
       document.getElementById('capeInput').addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
@@ -531,7 +734,6 @@ app.get('/dashboard', async (req, res) => {
         }
       });
 
-      // Animation Toggle
       function toggleAnimation() {
         const btn = document.getElementById('btnAnim');
         if (isWalking) {
@@ -554,7 +756,6 @@ app.get('/dashboard', async (req, res) => {
         skinViewer.controls.reset();
       }
 
-      // AJAX Upload with Progress Feedback
       document.getElementById('cosmeticsForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const btn = document.getElementById('saveBtn');
