@@ -9,9 +9,9 @@ const { createClient } = require('@supabase/supabase-js');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Direct Supabase Connection
+// Direct Supabase Connection with Administrative Service Role Key
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://rtfuamnwfrtyitxbakrl.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0ZnVhbW53ZnJ0eWl0eGJha3JsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIzMzY0ODgsImV4cCI6MjEwNzkxMjQ4OH0.treB5Pf3sA_07z5v20RnZXz5flHWdNg3RrpbR_sQEIY';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || 'EyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0ZnVhbW53ZnJ0eWl0eGJha3JsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjMzNjQ4OCwiZXhwIjoyMTA3OTEyNDg4fQ.HHd9Z51aFBmqBRZ8TPQEb7Y_XqgwpQRlkEm7ENvVbBM';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // RSA Keypair setup for authlib-injector
@@ -147,7 +147,6 @@ function renderLayout(title, content, activeUser = null) {
       }
       footer { border-top: 1px solid var(--border); text-align: center; padding: 28px; color: var(--text-muted); font-size: 0.85rem; }
       
-      /* Toast notification */
       #toast {
         position: fixed;
         bottom: 28px;
@@ -201,7 +200,7 @@ function renderLayout(title, content, activeUser = null) {
   </html>`;
 }
 
-// 1. Interactive Landing Page
+// 1. Landing Page
 app.get('/', (req, res) => {
   if (req.headers.accept && req.headers.accept.includes('application/json')) {
     return res.json({
@@ -212,7 +211,6 @@ app.get('/', (req, res) => {
   }
 
   const content = `
-    <!-- Hero Banner -->
     <div style="text-align: center; padding: 60px 0 50px; position: relative;">
       <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); color: #60a5fa; padding: 6px 16px; border-radius: 30px; font-size: 0.85rem; font-weight: 700; margin-bottom: 24px;">
         🚀 Optimized for Samsung Galaxy Tab S9 FE & Android Devices
@@ -236,7 +234,6 @@ app.get('/', (req, res) => {
       </div>
     </div>
 
-    <!-- Feature Grid with Images & Assets -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; margin-top: 30px;">
       <div class="card">
         <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 14px;">
@@ -246,7 +243,7 @@ app.get('/', (req, res) => {
           <h3 style="font-size: 1.25rem; font-weight: 700;">Desktop Performance</h3>
         </div>
         <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.6;">
-          Native ARM64 OpenJDK execution with hardware-accelerated Vulkan & OpenGL (Zink / VirGL / HolyGL) drivers tailored for modern tablets.
+          Native ARM64 OpenJDK execution with hardware-accelerated Vulkan & OpenGL drivers tailored for modern tablets.
         </p>
       </div>
 
@@ -278,7 +275,7 @@ app.get('/', (req, res) => {
   res.send(renderLayout('Home', content, req.session ? req.session.user : null));
 });
 
-// 2. Download Center with Detailed Device Specs
+// 2. Download Center
 app.get('/downloads', (req, res) => {
   const content = `
     <div style="max-width: 780px; margin: 0 auto;">
@@ -317,7 +314,6 @@ app.get('/downloads', (req, res) => {
         </div>
       </div>
 
-      <!-- Quick Install Guide -->
       <div class="card">
         <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 14px;">📋 Installation Instructions</h3>
         <ol style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.8; padding-left: 20px;">
@@ -332,7 +328,7 @@ app.get('/downloads', (req, res) => {
   res.send(renderLayout('Downloads', content, req.session ? req.session.user : null));
 });
 
-// 3. Auth Page (Real-Time Availability Check)
+// 3. Auth Page
 app.get('/auth', (req, res) => {
   if (req.session && req.session.user) return res.redirect('/dashboard');
 
@@ -467,7 +463,7 @@ app.get('/logout', (req, res) => {
   res.redirect('/');
 });
 
-// 4. Interactive 3D Cosmetics Studio (Selective View Controls)
+// 4. Interactive 3D Cosmetics Studio
 app.get('/dashboard', async (req, res) => {
   if (!req.session || !req.session.user) return res.redirect('/auth');
 
@@ -582,7 +578,6 @@ app.get('/dashboard', async (req, res) => {
     <div class="studio-grid">
       <!-- 3D Canvas Box -->
       <div class="viewer-box">
-        <!-- Selective 3D View Toggles -->
         <div class="view-selector-bar">
           <button type="button" class="view-tab active" onclick="switchView('full')">Full Player</button>
           <button type="button" class="view-tab" onclick="switchView('skin')">Skin Only</button>
@@ -661,7 +656,6 @@ app.get('/dashboard', async (req, res) => {
         }
       }
 
-      // Switch View: 'full', 'skin', 'cape', 'elytra'
       function switchView(mode) {
         currentMode = mode;
         document.querySelectorAll('.view-tab').forEach(b => b.classList.remove('active'));
@@ -813,7 +807,7 @@ app.get('/dashboard', async (req, res) => {
   res.send(renderLayout('Cosmetics Studio', content, req.session.user));
 });
 
-// Cloud Upload API
+// Cloud Upload API (Using flat root files to prevent bucket folder errors)
 app.post('/upload', upload.fields([{ name: 'skin', maxCount: 1 }, { name: 'cape', maxCount: 1 }]), async (req, res) => {
   if (!req.session || !req.session.user) return res.status(401).send('Unauthorized');
 
@@ -824,19 +818,39 @@ app.post('/upload', upload.fields([{ name: 'skin', maxCount: 1 }, { name: 'cape'
   try {
     if (req.files && req.files['skin'] && req.files['skin'][0]) {
       const file = req.files['skin'][0];
-      const filePath = `skins/${username.toLowerCase()}_${Date.now()}.png`;
-      const { data, error } = await supabase.storage.from('cosmetics').upload(filePath, file.buffer, { contentType: 'image/png', upsert: true });
-      if (error) throw error;
-      const { data: publicData } = supabase.storage.from('cosmetics').getPublicUrl(filePath);
+      const fileName = `${username.toLowerCase()}_skin_${Date.now()}.png`;
+      const { data, error } = await supabase.storage
+        .from('cosmetics')
+        .upload(fileName, file.buffer, {
+          contentType: 'image/png',
+          upsert: true
+        });
+
+      if (error) {
+        console.error('Skin upload error:', error);
+        throw error;
+      }
+
+      const { data: publicData } = supabase.storage.from('cosmetics').getPublicUrl(fileName);
       updates.skin_url = publicData.publicUrl;
     }
 
     if (req.files && req.files['cape'] && req.files['cape'][0]) {
       const file = req.files['cape'][0];
-      const filePath = `capes/${username.toLowerCase()}_${Date.now()}.png`;
-      const { data, error } = await supabase.storage.from('cosmetics').upload(filePath, file.buffer, { contentType: 'image/png', upsert: true });
-      if (error) throw error;
-      const { data: publicData } = supabase.storage.from('cosmetics').getPublicUrl(filePath);
+      const fileName = `${username.toLowerCase()}_cape_${Date.now()}.png`;
+      const { data, error } = await supabase.storage
+        .from('cosmetics')
+        .upload(fileName, file.buffer, {
+          contentType: 'image/png',
+          upsert: true
+        });
+
+      if (error) {
+        console.error('Cape upload error:', error);
+        throw error;
+      }
+
+      const { data: publicData } = supabase.storage.from('cosmetics').getPublicUrl(fileName);
       updates.cape_url = publicData.publicUrl;
     }
 
@@ -845,6 +859,7 @@ app.post('/upload', upload.fields([{ name: 'skin', maxCount: 1 }, { name: 'cape'
 
     res.status(200).send('OK');
   } catch (err) {
+    console.error('Upload handler error:', err);
     res.status(500).send(err.message);
   }
 });
