@@ -5,14 +5,23 @@ const fs = require('fs');
 const path = require('path');
 const cookieSession = require('cookie-session');
 const { createClient } = require('@supabase/supabase-js');
+const cloudinary = require('cloudinary').v2;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Direct Supabase Connection with Administrative Service Role Key
+// 1. Supabase Database Connection (User authentication & metadata)
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://rtfuamnwfrtyitxbakrl.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'EyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0ZnVhbW53ZnJ0eWl0eGJha3JsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjMzNjQ4OCwiZXhwIjoyMTA3OTEyNDg4fQ.HHd9Z51aFBmqBRZ8TPQEb7Y_XqgwpQRlkEm7ENvVbBM';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// 2. Cloudinary Configuration (Direct image CDN integration)
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'ue0qjmbk',
+  api_key: process.env.CLOUDINARY_API_KEY || '464384322119385',
+  api_secret: process.env.CLOUDINARY_API_SECRET || 'xb0hUD0kVB8GtwydDWS7QAp17bY',
+  secure: true
+});
 
 // RSA Keypair setup for authlib-injector
 if (!fs.existsSync('keys')) fs.mkdirSync('keys');
@@ -48,6 +57,25 @@ function getOfflineUUID(username) {
   md5[6] = (md5[6] & 0x0f) | 0x30;
   md5[8] = (md5[8] & 0x3f) | 0x80;
   return md5.toString('hex');
+}
+
+function uploadToCloudinary(buffer, publicId, folder) {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: folder,
+        public_id: publicId,
+        overwrite: true,
+        resource_type: 'image',
+        format: 'png'
+      },
+      (error, result) => {
+        if (error) return reject(error);
+        resolve(result.secure_url);
+      }
+    );
+    uploadStream.end(buffer);
+  });
 }
 
 function renderLayout(title, content, activeUser = null) {
@@ -185,7 +213,7 @@ function renderLayout(title, content, activeUser = null) {
     </nav>
     <div class="container">${content}</div>
     <div id="toast"></div>
-    <footer>&copy; 2026 AksuLauncher &bull; Built for Android &bull; Powered by Supabase Cloud</footer>
+    <footer>&copy; 2026 AksuLauncher &bull; Powered by Cloudinary CDN & Supabase</footer>
 
     <script>
       function showToast(message, type = 'info') {
@@ -204,8 +232,8 @@ function renderLayout(title, content, activeUser = null) {
 app.get('/', (req, res) => {
   if (req.headers.accept && req.headers.accept.includes('application/json')) {
     return res.json({
-      meta: { serverName: "AksuSkinServer", implementationName: "AksuSkinServer", implementationVersion: "2.0.0" },
-      skinDomains: [req.get('host'), new URL(SUPABASE_URL).hostname],
+      meta: { serverName: "AksuSkinServer", implementationName: "AksuSkinServer", implementationVersion: "2.1.0" },
+      skinDomains: [req.get('host'), 'res.cloudinary.com'],
       signaturePublickey: publicKey
     });
   }
@@ -222,7 +250,7 @@ app.get('/', (req, res) => {
         </span>
       </h1>
       <p style="color: var(--text-muted); font-size: 1.2rem; max-width: 680px; margin: 0 auto 36px; line-height: 1.6;">
-        A high-performance Java Launcher running OpenJDK 17 with an integrated 3D cosmetics studio. Zero cloud resets, instant sync.
+        A high-performance Java Launcher running OpenJDK 17 with an integrated 3D cosmetics studio. Zero resets, ultra-fast CDN delivery.
       </p>
       <div style="display: flex; justify-content: center; gap: 16px; flex-wrap: wrap;">
         <a href="/downloads" class="btn" style="padding: 15px 32px; font-size: 1.05rem;">
@@ -264,10 +292,10 @@ app.get('/', (req, res) => {
           <div style="background: rgba(16, 185, 129, 0.15); width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center;">
             <img src="https://raw.githubusercontent.com/twitter/twemoji/master/assets/72x72/1f512.png" style="width: 28px; height: 28px;">
           </div>
-          <h3 style="font-size: 1.25rem; font-weight: 700;">Zero Data Wipes</h3>
+          <h3 style="font-size: 1.25rem; font-weight: 700;">Zero Storage Lockouts</h3>
         </div>
         <p style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.6;">
-          All user profiles, usernames, and skin files are permanently stored in an enterprise PostgreSQL and S3 cloud bucket powered by Supabase.
+          User profiles are stored safely in PostgreSQL, and image textures stream instantly through Cloudinary's global media network.
         </p>
       </div>
     </div>
@@ -289,39 +317,14 @@ app.get('/downloads', (req, res) => {
           <div style="display: flex; gap: 18px; align-items: center;">
             <img src="https://raw.githubusercontent.com/PrismLauncher/PrismLauncher/develop/launcher/resources/multimc/scalable/multimc.svg" style="width: 54px; height: 54px;">
             <div>
-              <div style="font-weight: 800; font-size: 1.3rem;">AksuLauncher v3 (Latest Action Build)</div>
-              <div style="color: #10b981; font-weight: 700; font-size: 0.85rem; margin-top: 4px;">● Verified Stable &bull; OpenJDK 17 + JRE 21</div>
+              <div style="font-weight: 800; font-size: 1.3rem;">AksuLauncher v3 (Actions Build)</div>
+              <div style="color: #10b981; font-weight: 700; font-size: 0.85rem; margin-top: 4px;">● Stable &bull; OpenJDK 17 + JRE 21</div>
             </div>
           </div>
           <a href="https://github.com/AKSU1501/AksuLauncher/actions" target="_blank" class="btn" style="padding: 14px 26px;">
             📥 Download Latest Build
           </a>
         </div>
-
-        <div style="margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border); display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; text-align: center;">
-          <div style="background: rgba(15, 19, 29, 0.6); padding: 12px; border-radius: 12px; border: 1px solid var(--border);">
-            <div style="color: var(--text-muted); font-size: 0.75rem; font-weight: 700;">PLATFORM</div>
-            <div style="font-weight: 800; font-size: 0.95rem; margin-top: 4px;">Android 8.0+</div>
-          </div>
-          <div style="background: rgba(15, 19, 29, 0.6); padding: 12px; border-radius: 12px; border: 1px solid var(--border);">
-            <div style="color: var(--text-muted); font-size: 0.75rem; font-weight: 700;">ARCHITECTURE</div>
-            <div style="font-weight: 800; font-size: 0.95rem; margin-top: 4px;">ARM64 / AArch64</div>
-          </div>
-          <div style="background: rgba(15, 19, 29, 0.6); padding: 12px; border-radius: 12px; border: 1px solid var(--border);">
-            <div style="color: var(--text-muted); font-size: 0.75rem; font-weight: 700;">MINECRAFT</div>
-            <div style="font-weight: 800; font-size: 0.95rem; margin-top: 4px;">1.7.10 to 1.21+</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 14px;">📋 Installation Instructions</h3>
-        <ol style="color: var(--text-muted); font-size: 0.95rem; line-height: 1.8; padding-left: 20px;">
-          <li>Tap <b>Download Latest Build</b> to open GitHub Actions artifacts.</li>
-          <li>Install the compiled APK on your device.</li>
-          <li>Open AksuLauncher and add a Local/Offline account matching your website username.</li>
-          <li>Your cloud skins, capes, and Elytras will automatically render inside the game.</li>
-        </ol>
       </div>
     </div>
   `;
@@ -359,8 +362,8 @@ app.get('/auth', (req, res) => {
           <p style="color: var(--text-muted); font-size: 0.9rem; margin-top: 6px;">Register your exact name to protect your skin & capes.</p>
         </div>
         <form action="/register" method="post">
-          <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Minecraft Username (Exact In-Game)</label>
-          <input type="text" name="username" id="regUser" onkeyup="checkUsername()" required placeholder="e.g. SteveMaster" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:#0c0e14; color:#fff; margin-bottom:4px; font-size: 0.95rem;">
+          <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Minecraft Username</label>
+          <input type="text" name="username" id="regUser" onkeyup="checkUsername()" required placeholder="Exact in-game name" style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:#0c0e14; color:#fff; margin-bottom:4px; font-size: 0.95rem;">
           <div id="userFeedback" style="font-size:0.8rem; height: 18px; margin-bottom: 12px; font-weight: 700;"></div>
 
           <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Email Address</label>
@@ -369,7 +372,7 @@ app.get('/auth', (req, res) => {
           <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Password</label>
           <input type="password" name="password" required style="width:100%; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:#0c0e14; color:#fff; margin-bottom:24px; font-size: 0.95rem;">
 
-          <button type="submit" id="regBtn" class="btn" style="width:100%;">Register & Reserve</button>
+          <button type="submit" id="regBtn" class="btn" style="width:100%;">Register Account</button>
         </form>
         <div style="text-align: center; margin-top: 20px; font-size: 0.9rem; color: var(--text-muted);">
           Already claimed? <a onclick="toggleAuth()" style="color: var(--accent); cursor: pointer; font-weight: 700;">Sign In</a>
@@ -394,7 +397,7 @@ app.get('/auth', (req, res) => {
         if (!name) { fb.innerText = ''; return; }
         
         timeout = setTimeout(async () => {
-          fb.innerText = 'Checking database...';
+          fb.innerText = 'Checking...';
           fb.style.color = '#94a3b8';
           const res = await fetch('/api/check-user?username=' + encodeURIComponent(name));
           const data = await res.json();
@@ -463,7 +466,7 @@ app.get('/logout', (req, res) => {
   res.redirect('/');
 });
 
-// 4. Interactive 3D Cosmetics Studio
+// 4. Interactive 3D Studio with Cloudinary
 app.get('/dashboard', async (req, res) => {
   if (!req.session || !req.session.user) return res.redirect('/auth');
 
@@ -571,12 +574,11 @@ app.get('/dashboard', async (req, res) => {
         <p style="color: var(--text-muted); font-size: 0.95rem;">Interactive 3D preview for player <b style="color:#60a5fa;">${req.session.user}</b></p>
       </div>
       <div style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); color: #34d399; padding: 6px 16px; border-radius: 20px; font-size: 0.85rem; font-weight: 700;">
-        ● Supabase Cloud Synced
+        ● Cloudinary CDN Connected
       </div>
     </div>
 
     <div class="studio-grid">
-      <!-- 3D Canvas Box -->
       <div class="viewer-box">
         <div class="view-selector-bar">
           <button type="button" class="view-tab active" onclick="switchView('full')">Full Player</button>
@@ -593,7 +595,6 @@ app.get('/dashboard', async (req, res) => {
         </div>
       </div>
 
-      <!-- Settings & Form -->
       <div class="card">
         <form id="cosmeticsForm">
           <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 8px;">Arm Geometry Model</label>
@@ -602,7 +603,6 @@ app.get('/dashboard', async (req, res) => {
             <option value="slim" ${modelType === 'slim' ? 'selected' : ''}>Slim 3-pixel arm (Alex)</option>
           </select>
 
-          <!-- Skin Selector -->
           <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;">Skin Texture (.png)</label>
           <div class="file-dropzone" onclick="document.getElementById('skinInput').click()">
             <div id="skinLabel" style="font-size: 0.95rem; font-weight: 600; color: #fff;">${skinUrl ? '✓ Custom Skin Loaded' : 'Select skin PNG'}</div>
@@ -610,7 +610,6 @@ app.get('/dashboard', async (req, res) => {
             <input type="file" id="skinInput" name="skin" style="display:none;">
           </div>
 
-          <!-- Cape Selector -->
           <label style="display:block; font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-top: 18px; margin-bottom: 6px;">Cape & Elytra (.png)</label>
           <div class="file-dropzone" onclick="document.getElementById('capeInput').click()">
             <div id="capeLabel" style="font-size: 0.95rem; font-weight: 600; color: #fff;">${capeUrl ? '✓ Custom Cape Loaded' : 'Select cape PNG'}</div>
@@ -623,7 +622,7 @@ app.get('/dashboard', async (req, res) => {
           </div>
 
           <button type="submit" id="saveBtn" class="btn" style="width:100%; margin-top:24px; padding:15px;">
-            Save to Cloud
+            Save to Cloudinary
           </button>
         </form>
       </div>
@@ -757,7 +756,7 @@ app.get('/dashboard', async (req, res) => {
         const progressBar = document.getElementById('progressBar');
         
         btn.disabled = true;
-        btn.innerText = 'Uploading to Supabase...';
+        btn.innerText = 'Uploading to Cloudinary...';
         progressWrap.style.display = 'block';
         progressBar.style.width = '30%';
 
@@ -775,25 +774,25 @@ app.get('/dashboard', async (req, res) => {
         xhr.onload = function() {
           progressBar.style.width = '100%';
           if (xhr.status === 200) {
-            showToast('Cosmetics saved and synced to Cloud!', 'success');
+            showToast('Cosmetics saved to Cloudinary CDN!', 'success');
             btn.innerText = '✓ Saved Successfully!';
             setTimeout(() => {
               btn.disabled = false;
-              btn.innerText = 'Save to Cloud';
+              btn.innerText = 'Save to Cloudinary';
               progressWrap.style.display = 'none';
               progressBar.style.width = '0%';
             }, 2500);
           } else {
             showToast('Upload failed: ' + xhr.responseText, 'error');
             btn.disabled = false;
-            btn.innerText = 'Save to Cloud';
+            btn.innerText = 'Save to Cloudinary';
           }
         };
 
         xhr.onerror = function() {
           showToast('Network error while saving.', 'error');
           btn.disabled = false;
-          btn.innerText = 'Save to Cloud';
+          btn.innerText = 'Save to Cloudinary';
         };
 
         xhr.send(formData);
@@ -807,7 +806,7 @@ app.get('/dashboard', async (req, res) => {
   res.send(renderLayout('Cosmetics Studio', content, req.session.user));
 });
 
-// Cloud Upload API (Using flat root files to prevent bucket folder errors)
+// 5. Cloudinary Direct Upload Route
 app.post('/upload', upload.fields([{ name: 'skin', maxCount: 1 }, { name: 'cape', maxCount: 1 }]), async (req, res) => {
   if (!req.session || !req.session.user) return res.status(401).send('Unauthorized');
 
@@ -818,40 +817,16 @@ app.post('/upload', upload.fields([{ name: 'skin', maxCount: 1 }, { name: 'cape'
   try {
     if (req.files && req.files['skin'] && req.files['skin'][0]) {
       const file = req.files['skin'][0];
-      const fileName = `${username.toLowerCase()}_skin_${Date.now()}.png`;
-      const { data, error } = await supabase.storage
-        .from('cosmetics')
-        .upload(fileName, file.buffer, {
-          contentType: 'image/png',
-          upsert: true
-        });
-
-      if (error) {
-        console.error('Skin upload error:', error);
-        throw error;
-      }
-
-      const { data: publicData } = supabase.storage.from('cosmetics').getPublicUrl(fileName);
-      updates.skin_url = publicData.publicUrl;
+      const publicId = `${username.toLowerCase()}_skin_${Date.now()}`;
+      const url = await uploadToCloudinary(file.buffer, publicId, 'aksu_skins');
+      updates.skin_url = url;
     }
 
     if (req.files && req.files['cape'] && req.files['cape'][0]) {
       const file = req.files['cape'][0];
-      const fileName = `${username.toLowerCase()}_cape_${Date.now()}.png`;
-      const { data, error } = await supabase.storage
-        .from('cosmetics')
-        .upload(fileName, file.buffer, {
-          contentType: 'image/png',
-          upsert: true
-        });
-
-      if (error) {
-        console.error('Cape upload error:', error);
-        throw error;
-      }
-
-      const { data: publicData } = supabase.storage.from('cosmetics').getPublicUrl(fileName);
-      updates.cape_url = publicData.publicUrl;
+      const publicId = `${username.toLowerCase()}_cape_${Date.now()}`;
+      const url = await uploadToCloudinary(file.buffer, publicId, 'aksu_capes');
+      updates.cape_url = url;
     }
 
     const { error: dbError } = await supabase.from('users').update(updates).ilike('username', username);
@@ -859,12 +834,12 @@ app.post('/upload', upload.fields([{ name: 'skin', maxCount: 1 }, { name: 'cape'
 
     res.status(200).send('OK');
   } catch (err) {
-    console.error('Upload handler error:', err);
+    console.error('Cloudinary Upload Error:', err);
     res.status(500).send(err.message);
   }
 });
 
-// 5. Yggdrasil API Session profile for AksuLauncher
+// 6. Yggdrasil API Session profile for AksuLauncher
 app.get('/sessionserver/session/minecraft/profile/:uuid', async (req, res) => {
   const uuid = req.params.uuid.replace(/-/g, '').toLowerCase();
 
