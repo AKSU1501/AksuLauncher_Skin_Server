@@ -11,8 +11,9 @@ const PORT = process.env.PORT || 3000;
 
 // 1. Supabase Administrative Connection
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://rtfuamnwfrtyitxbakrl.supabase.co';
-const SUPABASE_KEY = process.env.SUPABASE_KEY || 'sb_secret_KUuPyR61WiKuZ_sJGKK5qQ_ikfgZleR';
+const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0ZnVhbW53ZnJ0eWl0eGJha3JsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjMzNjQ4OCwiZXhwIjoyMTA3OTEyNDg4fQ.HHd9Z51aFBmqBRZ8TPQEb7Y_XqgwpQRlkEm7ENvVbBM';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
 
 // 2. Cloudinary Configuration
 cloudinary.config({
