@@ -14,7 +14,6 @@ const SUPABASE_URL = process.env.SUPABASE_URL || 'https://rtfuamnwfrtyitxbakrl.s
 const SUPABASE_KEY = process.env.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ0ZnVhbW53ZnJ0eWl0eGJha3JsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MjMzNjQ4OCwiZXhwIjoyMTA3OTEyNDg4fQ.HHd9Z51aFBmqBRZ8TPQEb7Y_XqgwpQRlkEm7ENvVbBM';
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-
 // 2. Cloudinary Configuration
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'ue0qjmbk',
@@ -464,7 +463,6 @@ app.post('/register', async (req, res) => {
     return res.send(renderLayout('Error', `<div class="card" style="text-align:center;"><h3>Registration Error</h3><p style="margin:12px 0; color:var(--text-muted);">${error.message}</p><a href="/auth" class="btn">Back</a></div>`));
   }
 
-  // Create initial Minecraft username profile if available
   if (firstMc) {
     await supabase.from('profiles').insert({
       account_id: acc.id,
@@ -492,7 +490,6 @@ app.post('/login', async (req, res) => {
     return res.send(renderLayout('Error', `<div class="card" style="text-align:center;"><h3>Invalid Credentials</h3><p style="margin:14px 0;"><a href="/auth" class="btn">Try Again</a></p></div>`));
   }
 
-  // Ensure AKSU1501 always has admin rights
   const isAdmin = acc.is_admin || acc.account_name.toUpperCase() === 'AKSU1501';
   req.session.accountId = acc.id;
   req.session.accountName = acc.account_name;
@@ -574,18 +571,22 @@ app.get('/dashboard', async (req, res) => {
             <option value="slim" ${modelType === 'slim' ? 'selected' : ''}>Slim 3-pixel (Alex)</option>
           </select>
 
-          <label>Skin Texture (.png)</label>
-          <div class="file-dropzone" onclick="document.getElementById('skinInput').click()">
-            <div id="skinLabel" style="font-weight:700;">${skinUrl ? '✓ Custom Skin Active (Tap to Change)' : 'Tap to Upload Skin PNG'}</div>
+          <label style="display:block; cursor:pointer;">
+            <span style="font-size:0.82rem; font-weight:700; color:var(--text-muted); margin-bottom:6px; display:block;">Skin Texture (.png)</span>
+            <div class="file-dropzone" style="pointer-events: none;">
+              <div id="skinLabel" style="font-weight:700;">${skinUrl ? '✓ Custom Skin Active (Tap to Change)' : 'Tap to Upload Skin PNG'}</div>
+            </div>
             <input type="file" id="skinInput" name="skin" accept="image/png" style="display:none;">
-          </div>
+          </label>
           ${skinUrl ? `<button type="button" onclick="clearAsset('${activeProfile.id}', 'skin')" class="btn btn-danger" style="width:100%; margin-top:8px; padding:8px; font-size:0.8rem;">Remove Custom Skin</button>` : ''}
 
-          <label style="margin-top:16px;">Cape & Elytra (.png)</label>
-          <div class="file-dropzone" onclick="document.getElementById('capeInput').click()">
-            <div id="capeLabel" style="font-weight:700;">${capeUrl ? '✓ Custom Cape Active (Tap to Change)' : 'Tap to Upload Cape PNG'}</div>
+          <label style="display:block; cursor:pointer; margin-top:16px;">
+            <span style="font-size:0.82rem; font-weight:700; color:var(--text-muted); margin-bottom:6px; display:block;">Cape & Elytra (.png)</span>
+            <div class="file-dropzone" style="pointer-events: none;">
+              <div id="capeLabel" style="font-weight:700;">${capeUrl ? '✓ Custom Cape Active (Tap to Change)' : 'Tap to Upload Cape PNG'}</div>
+            </div>
             <input type="file" id="capeInput" name="cape" accept="image/png" style="display:none;">
-          </div>
+          </label>
           ${capeUrl ? `<button type="button" onclick="clearAsset('${activeProfile.id}', 'cape')" class="btn btn-danger" style="width:100%; margin-top:8px; padding:8px; font-size:0.8rem;">Remove Custom Cape</button>` : ''}
 
           <button type="submit" id="saveBtn" class="btn" style="width:100%; margin-top:22px; padding:14px;">💾 Save Changes to Cloud</button>
@@ -611,7 +612,7 @@ app.get('/dashboard', async (req, res) => {
       .viewer-controls { position: absolute; bottom: 14px; display: flex; gap: 8px; z-index: 10; }
       .pill-btn { background: rgba(20, 25, 38, 0.85); border: 1px solid var(--border); color: #fff; padding: 6px 14px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
       .pill-btn.active { background: var(--accent); border-color: var(--accent); }
-      .file-dropzone { border: 2px dashed var(--border); border-radius: 12px; padding: 16px; text-align: center; cursor: pointer; background: rgba(11, 14, 22, 0.6); }
+      .file-dropzone { border: 2px dashed var(--border); border-radius: 12px; padding: 16px; text-align: center; background: rgba(11, 14, 22, 0.6); }
       .file-dropzone:hover { border-color: var(--accent); }
     </style>
 
@@ -641,7 +642,6 @@ app.get('/dashboard', async (req, res) => {
     </div>
 
     <script>
-      // Add New Username Profile
       document.getElementById('addProfileForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const mc_username = document.getElementById('newMcName').value.trim();
@@ -693,7 +693,6 @@ app.get('/dashboard', async (req, res) => {
         if (r.ok) location.href = '/';
       }
 
-      // Initialize 3D Viewer if an active profile exists
       const canvas = document.getElementById("skin_container");
       if (canvas) {
         const defaultSkin = "https://textures.minecraft.net/texture/31f477eb1a7beee631c2ca64d06f0f6fa9ff2cf93ae9cf745fca20ba5979f8a6";
